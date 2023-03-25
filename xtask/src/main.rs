@@ -1,7 +1,6 @@
 use xshell::{cmd, Shell};
 
 mod flags {
-    use anyhow::bail;
     use std::{vec, vec::Vec};
     use xflags;
     use xshell::{cmd, Shell};
@@ -10,46 +9,21 @@ mod flags {
         src "./src/main.rs"
 
         cmd xtask {
-            cmd check {
-                required --binary binary: String
-                optional --json-message-format
-            }
+            required --binary binary: String
+            optional --json-message-format
+
+            cmd check {}
+            cmd build {}
         }
     }
 
     // A list of all the valid binaries
     const ALL_BINARIES: [&'static str; 2] = ["aarch64-qemu", "x86_64-uefi"];
 
-    fn create_binary_list(binary: &str) -> Vec<&str> {
-        if binary == "all" {
-            Vec::from(ALL_BINARIES)
-        } else {
-            vec![binary]
-        }
-    }
-
-    fn create_flags(json_message_format: bool) -> Vec<&'static str> {
-        let mut flags = vec![
-            "-Zbuild-std=core,compiler_builtins,alloc",
-            "-Zbuild-std-features=compiler-builtins-mem",
-        ];
-        if json_message_format {
-            flags.push("--message-format=json");
-        }
-
-        flags
-    }
-
     fn run_cargo(sh: &Shell, subcommand: &str, binary: &str, flags: &[&str]) -> anyhow::Result<()> {
-        let target = match binary {
-            "aarch64-qemu" => "aarch64-unknown-none",
-            "x86_64-uefi" => "x86_64-unknown-uefi",
-            _ => bail!("Invalid binary: {}", binary),
-        };
-
         cmd!(
             sh,
-            "cargo {subcommand} -p {binary} --target {target} {flags...}"
+            "cargo {subcommand} -p {binary} --target binaries/{binary}/{binary}.json {flags...}"
         )
         .run()?;
 
@@ -59,30 +33,62 @@ mod flags {
     #[derive(Debug)]
     pub struct Xtask {
         pub subcommand: XtaskCmd,
-    }
-
-    #[derive(Debug)]
-    pub enum XtaskCmd {
-        Check(Check),
-    }
-
-    #[derive(Debug)]
-    pub struct Check {
         pub binary: String,
         pub json_message_format: bool,
     }
 
-    impl Check {
+    impl Xtask {
+        fn create_binary_list(&self) -> Vec<&str> {
+            if self.binary == "all" {
+                Vec::from(ALL_BINARIES)
+            } else {
+                vec![self.binary.as_str()]
+            }
+        }
+
+        fn create_flags(&self) -> Vec<&'static str> {
+            let mut flags = vec![
+                "-Zbuild-std=core,compiler_builtins,alloc",
+                "-Zbuild-std-features=compiler-builtins-mem",
+            ];
+            if self.json_message_format {
+                flags.push("--message-format=json");
+            }
+
+            flags
+        }
+
         pub fn run(self, sh: &Shell) -> anyhow::Result<()> {
-            let binaries = create_binary_list(self.binary.as_str());
-            let flags = create_flags(self.json_message_format);
+            let binaries = self.create_binary_list();
+            let flags = self.create_flags();
             for binary in binaries {
-                run_cargo(sh, "check", binary, flags.as_slice())?;
+                run_cargo(sh, self.subcommand.as_str(), binary, flags.as_slice())?;
             }
 
             Ok(())
         }
     }
+
+    #[derive(Debug)]
+    pub enum XtaskCmd {
+        Check(Check),
+        Build(Build),
+    }
+
+    impl XtaskCmd {
+        pub fn as_str(&self) -> &'static str {
+            match self {
+                Self::Check(_) => "check",
+                Self::Build(_) => "build",
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Check {}
+
+    #[derive(Debug)]
+    pub struct Build {}
 
     #[allow(dead_code)]
     impl Xtask {
@@ -99,14 +105,12 @@ mod flags {
 }
 
 fn main() -> anyhow::Result<()> {
-    let flags = flags::Xtask::from_env_or_exit();
+    let xtask = flags::Xtask::from_env_or_exit();
 
     let sh = Shell::new()?;
     cmd!(sh, "pwd").run()?;
 
-    match flags.subcommand {
-        flags::XtaskCmd::Check(check) => check.run(&sh)?,
-    }
+    xtask.run(&sh)?;
 
     Ok(())
 }
