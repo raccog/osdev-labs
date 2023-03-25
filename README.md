@@ -6,14 +6,15 @@ I'm currently figuring out how I want the workflow to be structured. This includ
 
 Here's a list of the currently working commands:
 
-* `cargo xtask check --target aarch64-unknown-none`
+* `cargo xtask check --target [all|aarch64-unknown-none|x86_64-unknown-uefi]`
 
-Yup, you can only do static analysis for aarch64 right now...
+Currently, only static analysis is implemented, no building or running yet.
 
-The plan is to add the following features to the workflow in order:
+### Workflow Roadmap
 
-* Static analysis for all targets (including xtask itself)
-* Building for aarch64
-* Building for all targets
-* Running aarch64 on qemu
-* Running x86_64-uefi on qemu
+[x] Static analysis for aarch64
+[x] Static analysis for all targets (including xtask itself)
+[ ] Building for aarch64
+[ ] Building for all targets
+[ ] Running aarch64 on qemu
+[ ] Running x86_64-uefi on qemu

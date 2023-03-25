@@ -2,7 +2,7 @@ use xshell::{cmd, Shell};
 
 mod flags {
     use anyhow::bail;
-    use std::vec;
+    use std::{vec, vec::Vec};
     use xflags;
     use xshell::{cmd, Shell};
 
@@ -17,7 +17,8 @@ mod flags {
         }
     }
 
-    // TODO: Option for '--mesage-format=json'
+    const ALL_TARGETS: [&'static str; 2] = ["aarch64-unknown-none", "x86_64-unknown-uefi"];
+
     #[derive(Debug)]
     pub struct Xtask {
         pub subcommand: XtaskCmd,
@@ -36,20 +37,28 @@ mod flags {
 
     impl Check {
         pub fn run(self, sh: &Shell) -> anyhow::Result<()> {
-            let target = self.target.as_str();
-            let binary = match target {
-                "aarch64-unknown-none" => "aarch64-qemu",
-                _ => bail!("Invalid target: {}", target),
+            let targets = if self.target == "all" {
+                Vec::from(ALL_TARGETS)
+            } else {
+                vec![self.target.as_str()]
             };
-            let mut flags = vec![
-                "-Zbuild-std=core,compiler_builtins,alloc",
-                "-Zbuild-std-features=compiler-builtins-mem",
-            ];
-            if self.json_message_format {
-                flags.push("--message-format=json");
-            }
 
-            cmd!(sh, "cargo check -p {binary} --target {target} {flags...}").run()?;
+            for target in targets {
+                let binary = match target {
+                    "aarch64-unknown-none" => "aarch64-qemu",
+                    "x86_64-unknown-uefi" => "x86_64-uefi",
+                    _ => bail!("Invalid target: {}", target),
+                };
+                let mut flags = vec![
+                    "-Zbuild-std=core,compiler_builtins,alloc",
+                    "-Zbuild-std-features=compiler-builtins-mem",
+                ];
+                if self.json_message_format {
+                    flags.push("--message-format=json");
+                }
+
+                cmd!(sh, "cargo check -p {binary} --target {target} {flags...}").run()?;
+            }
 
             Ok(())
         }

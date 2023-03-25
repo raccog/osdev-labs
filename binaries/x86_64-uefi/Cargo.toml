@@ -1,0 +1,17 @@
+[package]
+name = "x86_64-uefi"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+developing-modules = { path = "../../libraries/developing-modules" }
+uefi = { version = "0.19.1", features = [
+    "alloc",
+    "global_allocator",
+    "logger",
+] }
+uefi-services = { version = "0.16.0", default-features = false, features = [
+    "logger",
+] }
