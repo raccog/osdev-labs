@@ -18,12 +18,29 @@ mod flags {
     }
 
     // A list of all the valid binaries
-    const ALL_BINARIES: [&'static str; 2] = ["aarch64-qemu", "x86_64-uefi"];
+    const ALL_BINARIES: &'static [&'static str] = &["aarch64-qemu", "x86_64-uefi", "xtask"];
 
-    fn run_cargo(sh: &Shell, subcommand: &str, binary: &str, flags: &[&str]) -> anyhow::Result<()> {
+    fn run_cargo(
+        sh: &Shell,
+        subcommand: &str,
+        binary: &str,
+        flags: &[&str],
+        json_message_format: bool,
+    ) -> anyhow::Result<()> {
+        let msg_fmt = if json_message_format {
+            vec!["--message-format=json"]
+        } else {
+            Vec::new()
+        };
+
+        if binary == "xtask" {
+            cmd!(sh, "cargo {subcommand} -p xtask {msg_fmt...}").run()?;
+            return Ok(());
+        }
+
         cmd!(
             sh,
-            "cargo {subcommand} -p {binary} --target binaries/{binary}/{binary}.json {flags...}"
+            "cargo {subcommand} -p {binary} --target binaries/{binary}/{binary}.json {flags...} {msg_fmt...}"
         )
         .run()?;
 
@@ -47,22 +64,23 @@ mod flags {
         }
 
         fn create_flags(&self) -> Vec<&'static str> {
-            let mut flags = vec![
+            vec![
                 "-Zbuild-std=core,compiler_builtins,alloc",
                 "-Zbuild-std-features=compiler-builtins-mem",
-            ];
-            if self.json_message_format {
-                flags.push("--message-format=json");
-            }
-
-            flags
+            ]
         }
 
         pub fn run(self, sh: &Shell) -> anyhow::Result<()> {
             let binaries = self.create_binary_list();
             let flags = self.create_flags();
             for binary in binaries {
-                run_cargo(sh, self.subcommand.as_str(), binary, flags.as_slice())?;
+                run_cargo(
+                    sh,
+                    self.subcommand.as_str(),
+                    binary,
+                    flags.as_slice(),
+                    self.json_message_format,
+                )?;
             }
 
             Ok(())
