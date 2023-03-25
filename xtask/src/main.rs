@@ -11,13 +11,50 @@ mod flags {
 
         cmd xtask {
             cmd check {
-                required --target target: String
+                required --binary binary: String
                 optional --json-message-format
             }
         }
     }
 
-    const ALL_TARGETS: [&'static str; 2] = ["aarch64-unknown-none", "x86_64-unknown-uefi"];
+    // A list of all the valid binaries
+    const ALL_BINARIES: [&'static str; 2] = ["aarch64-qemu", "x86_64-uefi"];
+
+    fn create_binary_list(binary: &str) -> Vec<&str> {
+        if binary == "all" {
+            Vec::from(ALL_BINARIES)
+        } else {
+            vec![binary]
+        }
+    }
+
+    fn create_flags(json_message_format: bool) -> Vec<&'static str> {
+        let mut flags = vec![
+            "-Zbuild-std=core,compiler_builtins,alloc",
+            "-Zbuild-std-features=compiler-builtins-mem",
+        ];
+        if json_message_format {
+            flags.push("--message-format=json");
+        }
+
+        flags
+    }
+
+    fn run_cargo(sh: &Shell, subcommand: &str, binary: &str, flags: &[&str]) -> anyhow::Result<()> {
+        let target = match binary {
+            "aarch64-qemu" => "aarch64-unknown-none",
+            "x86_64-uefi" => "x86_64-unknown-uefi",
+            _ => bail!("Invalid binary: {}", binary),
+        };
+
+        cmd!(
+            sh,
+            "cargo {subcommand} -p {binary} --target {target} {flags...}"
+        )
+        .run()?;
+
+        Ok(())
+    }
 
     #[derive(Debug)]
     pub struct Xtask {
@@ -31,33 +68,16 @@ mod flags {
 
     #[derive(Debug)]
     pub struct Check {
-        pub target: String,
+        pub binary: String,
         pub json_message_format: bool,
     }
 
     impl Check {
         pub fn run(self, sh: &Shell) -> anyhow::Result<()> {
-            let targets = if self.target == "all" {
-                Vec::from(ALL_TARGETS)
-            } else {
-                vec![self.target.as_str()]
-            };
-
-            for target in targets {
-                let binary = match target {
-                    "aarch64-unknown-none" => "aarch64-qemu",
-                    "x86_64-unknown-uefi" => "x86_64-uefi",
-                    _ => bail!("Invalid target: {}", target),
-                };
-                let mut flags = vec![
-                    "-Zbuild-std=core,compiler_builtins,alloc",
-                    "-Zbuild-std-features=compiler-builtins-mem",
-                ];
-                if self.json_message_format {
-                    flags.push("--message-format=json");
-                }
-
-                cmd!(sh, "cargo check -p {binary} --target {target} {flags...}").run()?;
+            let binaries = create_binary_list(self.binary.as_str());
+            let flags = create_flags(self.json_message_format);
+            for binary in binaries {
+                run_cargo(sh, "check", binary, flags.as_slice())?;
             }
 
             Ok(())

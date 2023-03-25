@@ -3,7 +3,7 @@
         "cargo",
         "xtask",
         "check",
-        "--target",
+        "--binary",
         "all",
         "--json-message-format"
     ]
