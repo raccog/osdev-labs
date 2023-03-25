@@ -1,0 +1,10 @@
+{
+    "rust-analyzer.check.overrideCommand": [
+        "cargo",
+        "xtask",
+        "check",
+        "--target",
+        "aarch64-unknown-none",
+        "--json-message-format"
+    ]
+}
