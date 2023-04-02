@@ -6,7 +6,7 @@ use core::arch::global_asm;
 #[cfg(not(target_arch = "riscv64"))]
 compile_error!("This binary needs to be compiled for riscv64");
 
-global_asm!(include_str!("crt0.S"));
+global_asm!(include_str!("entry.S"));
 
 #[panic_handler]
 fn handle_panic(_info: &core::panic::PanicInfo) -> ! {

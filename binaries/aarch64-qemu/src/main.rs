@@ -9,7 +9,7 @@ use core::{arch::global_asm, fmt::Write};
 use developing_modules::aarch64::pl011_uart::{Pl011Uart, UART0_BASE_ADDRESS};
 
 // Include the start procedure
-global_asm!(include_str!("entry_stage0.S"));
+global_asm!(include_str!("entry.S"));
 
 #[panic_handler]
 fn handle_panic(info: &core::panic::PanicInfo) -> ! {
