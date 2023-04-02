@@ -20,11 +20,11 @@ mod flags {
                 optional --json-message-format
             }
             cmd package {
-                optional package_type: PackageType
+                required package_type: PackageType
             }
             cmd clean {}
             cmd run {
-                optional package_type: PackageType
+                required package_type: PackageType
             }
         }
     }
@@ -88,8 +88,8 @@ mod flags {
         /// Returns the required platform target to build for or an error if it could be built for any target.
         pub fn target(&self) -> anyhow::Result<&'static str> {
             match self {
-                Self::Aarch64Qemu => Ok("aarch64-unknown-none"),
-                Self::X86_64Uefi => Ok("x86_64-unknown-uefi"),
+                Self::Aarch64Qemu => Ok("binaries/aarch64-qemu/aarch64-qemu.json"),
+                Self::X86_64Uefi => Ok("binaries/x86_64-uefi/x86_64-uefi.json"),
                 _ => bail!("This binary does not need a specific target"),
             }
         }
@@ -109,6 +109,15 @@ mod flags {
                 "aarch64-qemu" => Ok(Self::Aarch64Qemu),
                 "x86_64-uefi" => Ok(Self::X86_64Uefi),
                 _ => Err("Invalid package type"),
+            }
+        }
+    }
+
+    impl PackageType {
+        pub fn binary(&self) -> Binary {
+            match self {
+                Self::Aarch64Qemu => Binary::Aarch64Qemu,
+                Self::X86_64Uefi => Binary::X86_64Uefi,
             }
         }
     }
@@ -134,12 +143,18 @@ mod flags {
     }
 
     impl XtaskCmd {
-        pub fn run(&self, sh: &Shell, xtask: &Xtask) -> anyhow::Result<()> {
+        pub fn as_trait(&self) -> anyhow::Result<&dyn Subcommand> {
             match self {
-                Self::Check(check) => check.run(sh, xtask),
-                Self::Build(build) => build.run(sh, xtask),
+                Self::Check(check) => Ok(check),
+                Self::Build(build) => Ok(build),
+                Self::Package(package) => Ok(package),
                 _ => bail!("Subcommand not implemented"),
             }
+        }
+
+        pub fn run(&self, sh: &Shell, xtask: &Xtask) -> anyhow::Result<()> {
+            let subcmd = self.as_trait()?;
+            subcmd.run(sh, xtask)
         }
     }
 
@@ -157,7 +172,7 @@ mod flags {
 
     #[derive(Debug)]
     pub struct Package {
-        pub package_type: Option<PackageType>,
+        pub package_type: PackageType,
     }
 
     #[derive(Debug)]
@@ -165,7 +180,7 @@ mod flags {
 
     #[derive(Debug)]
     pub struct Run {
-        pub package_type: Option<PackageType>,
+        pub package_type: PackageType,
     }
 
     pub trait Subcommand {
@@ -218,6 +233,67 @@ mod flags {
     impl Subcommand for Check {
         fn run(&self, sh: &Shell, xtask: &Xtask) -> anyhow::Result<()> {
             cargo_run("check", &self.binary, sh, xtask, self.json_message_format)
+        }
+    }
+
+    impl Subcommand for Package {
+        fn run(&self, sh: &Shell, xtask: &Xtask) -> anyhow::Result<()> {
+            let binary = self.package_type.binary();
+
+            // Build the needed binary before packaging the distribution.
+            let build = Build {
+                binary: Some(binary),
+                json_message_format: false,
+            };
+            build.run(sh, xtask)?;
+
+            match self.package_type {
+                PackageType::Aarch64Qemu => {
+                    // This binary does not need any packaging
+                }
+                PackageType::X86_64Uefi => {
+                    // TODO: Don't hardcode build directory
+                    // EFI System Partition path
+                    const ESP_PATH: &'static str = "target/x86_64-uefi/esp.img";
+                    const DISK_PATH: &'static str = "target/x86_64-uefi/disk.img";
+                    // TODO: Allow release binary to be used
+                    const BINARY_PATH: &'static str = "target/x86_64-uefi/debug/x86_64-uefi.efi";
+
+                    // TODO: Automatically pull or build OVMF firmware
+                    const OVMF_PATH: &'static str = "target/x86_64-uefi/OVMF.fd";
+
+                    // TODO: Ensure all these executables are available on the host system.
+                    // Create 64MB EFI System Partition
+                    cmd!(sh, "dd if=/dev/zero of={ESP_PATH} bs=1M count=64").run()?;
+                    // Format to FAT32
+                    cmd!(sh, "mkfs.vfat -F 32 {ESP_PATH}").run()?;
+                    // Create directories and copy bootloader
+                    cmd!(sh, "mmd -D s -i {ESP_PATH} '::/EFI'").run()?;
+                    cmd!(sh, "mmd -D s -i {ESP_PATH} '::/EFI/BOOT'").run()?;
+                    cmd!(
+                        sh,
+                        "mcopy -D o -i {ESP_PATH} {BINARY_PATH} '::/EFI/BOOT/BOOTX64.EFI'"
+                    )
+                    .run()?;
+
+                    // TODO: Use hdiutil on MacOS instead of parted
+                    // Create 66MB disk image
+                    cmd!(sh, "dd if=/dev/zero of={DISK_PATH} bs=1M count=66").run()?;
+                    // Create ESP partition
+                    cmd!(sh, "parted -s {DISK_PATH} mklabel gpt").run()?;
+                    cmd!(sh, "parted -s {DISK_PATH} mkpart ESP fat32 2048s 100%").run()?;
+                    cmd!(sh, "parted -s {DISK_PATH} set 1 esp on").run()?;
+
+                    // Copy FAT32 file system to disk image
+                    cmd!(
+                        sh,
+                        "dd if={ESP_PATH} of={DISK_PATH} bs=1M seek=1 count=64 conv=notrunc"
+                    )
+                    .run()?;
+                }
+            }
+
+            Ok(())
         }
     }
 
