@@ -11,6 +11,8 @@ mod flags {
         src "./src/main.rs"
 
         cmd xtask {
+            optional --release
+
             cmd check {
                 optional binary: Binary
                 optional --json-message-format
@@ -30,8 +32,7 @@ mod flags {
     }
 
     // A list of all the valid binaries
-    const ALL_BINARIES: &'static [Binary] =
-        &[Binary::Aarch64Qemu, Binary::X86_64Uefi, Binary::Xtask];
+    const ALL_BINARIES: &'static [Binary] = &[Binary::Aarch64Qemu, Binary::X86_64Uefi];
 
     // Some flags
     const JSON_MESSAGE_FORMAT_FLAG: &'static str = "--message-format=json";
@@ -77,8 +78,23 @@ mod flags {
             }
         }
 
+        /// Returns the build directory for this target; either release or debug.
+        pub fn build_directory(&self, release: bool) -> String {
+            let binary = self.as_str();
+            let build_type = if release { "release" } else { "debug" };
+            format!("target/{}/{}", binary, build_type)
+        }
+
         /// Returns true if this binary does not use the std library.
         pub fn is_no_std(&self) -> bool {
+            match self {
+                Self::Xtask => false,
+                _ => true,
+            }
+        }
+
+        /// Returns true if this binary needs to be built for a specific target.
+        pub fn needs_specific_target(&self) -> bool {
             match self {
                 Self::Xtask => false,
                 _ => true,
@@ -96,7 +112,7 @@ mod flags {
     }
 
     /// All pre-defined packaging types.
-    #[derive(Debug)]
+    #[derive(Copy, Clone, Debug)]
     pub enum PackageType {
         Aarch64Qemu,
         X86_64Uefi,
@@ -124,6 +140,7 @@ mod flags {
 
     #[derive(Debug)]
     pub struct Xtask {
+        pub release: bool,
         pub subcommand: XtaskCmd,
     }
 
@@ -148,6 +165,7 @@ mod flags {
                 Self::Check(check) => Ok(check),
                 Self::Build(build) => Ok(build),
                 Self::Package(package) => Ok(package),
+                Self::Run(run) => Ok(run),
                 _ => bail!("Subcommand not implemented"),
             }
         }
@@ -196,21 +214,28 @@ mod flags {
         json_message_format: bool,
     ) -> anyhow::Result<()> {
         // Run for all binaries if `binary` is none
-        let binaries = get_binaries(binary);
+        let mut binaries = get_binaries(binary);
+
+        // Only add xtask binary if JSON message format is on.
+        // This is becuase xtask is automatically checked and only needs to be checked again if its JSON message
+        // is needed as output.
+        if json_message_format {
+            binaries.push(Binary::Xtask);
+        }
 
         for binary in binaries {
             // Add no_std flags if needed
             let mut flags = if binary.is_no_std() {
-                let mut flags = Vec::from(CARGO_NO_STD_FLAGS);
-
-                // Add specified target flag
-                flags.push("--target");
-                flags.push(binary.target()?);
-
-                flags
+                Vec::from(CARGO_NO_STD_FLAGS)
             } else {
                 Vec::new()
             };
+
+            // Add specified target flag if necessary
+            if binary.needs_specific_target() {
+                flags.push("--target");
+                flags.push(binary.target()?);
+            }
 
             // JSON message format is needed for rust analyzer
             if json_message_format {
@@ -252,44 +277,79 @@ mod flags {
                     // This binary does not need any packaging
                 }
                 PackageType::X86_64Uefi => {
-                    // TODO: Don't hardcode build directory
+                    let build_dir = binary.build_directory(xtask.release);
                     // EFI System Partition path
-                    const ESP_PATH: &'static str = "target/x86_64-uefi/esp.img";
-                    const DISK_PATH: &'static str = "target/x86_64-uefi/disk.img";
-                    // TODO: Allow release binary to be used
-                    const BINARY_PATH: &'static str = "target/x86_64-uefi/debug/x86_64-uefi.efi";
-
-                    // TODO: Automatically pull or build OVMF firmware
-                    const OVMF_PATH: &'static str = "target/x86_64-uefi/OVMF.fd";
+                    let esp_path = format!("{}/esp.img", build_dir);
+                    let disk_path = format!("{}/disk.img", build_dir);
+                    let binary_path = format!("{}/{}.efi", build_dir, binary.as_str());
 
                     // TODO: Ensure all these executables are available on the host system.
                     // Create 64MB EFI System Partition
-                    cmd!(sh, "dd if=/dev/zero of={ESP_PATH} bs=1M count=64").run()?;
+                    cmd!(sh, "dd if=/dev/zero of={esp_path} bs=1M count=64").run()?;
                     // Format to FAT32
-                    cmd!(sh, "mkfs.vfat -F 32 {ESP_PATH}").run()?;
+                    cmd!(sh, "mkfs.vfat -F 32 {esp_path}").run()?;
                     // Create directories and copy bootloader
-                    cmd!(sh, "mmd -D s -i {ESP_PATH} '::/EFI'").run()?;
-                    cmd!(sh, "mmd -D s -i {ESP_PATH} '::/EFI/BOOT'").run()?;
+                    cmd!(sh, "mmd -D s -i {esp_path} '::/EFI'").run()?;
+                    cmd!(sh, "mmd -D s -i {esp_path} '::/EFI/BOOT'").run()?;
                     cmd!(
                         sh,
-                        "mcopy -D o -i {ESP_PATH} {BINARY_PATH} '::/EFI/BOOT/BOOTX64.EFI'"
+                        "mcopy -D o -i {esp_path} {binary_path} '::/EFI/BOOT/BOOTX64.EFI'"
                     )
                     .run()?;
 
                     // TODO: Use hdiutil on MacOS instead of parted
                     // Create 66MB disk image
-                    cmd!(sh, "dd if=/dev/zero of={DISK_PATH} bs=1M count=66").run()?;
+                    cmd!(sh, "dd if=/dev/zero of={disk_path} bs=1M count=66").run()?;
                     // Create ESP partition
-                    cmd!(sh, "parted -s {DISK_PATH} mklabel gpt").run()?;
-                    cmd!(sh, "parted -s {DISK_PATH} mkpart ESP fat32 2048s 100%").run()?;
-                    cmd!(sh, "parted -s {DISK_PATH} set 1 esp on").run()?;
+                    cmd!(sh, "parted -s {disk_path} mklabel gpt").run()?;
+                    cmd!(sh, "parted -s {disk_path} mkpart ESP fat32 2048s 100%").run()?;
+                    cmd!(sh, "parted -s {disk_path} set 1 esp on").run()?;
 
                     // Copy FAT32 file system to disk image
                     cmd!(
                         sh,
-                        "dd if={ESP_PATH} of={DISK_PATH} bs=1M seek=1 count=64 conv=notrunc"
+                        "dd if={esp_path} of={disk_path} bs=1M seek=1 count=64 conv=notrunc"
                     )
                     .run()?;
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    impl Subcommand for Run {
+        fn run(&self, sh: &Shell, xtask: &Xtask) -> anyhow::Result<()> {
+            // Package the needed distribution before running
+            let package = Package {
+                package_type: self.package_type,
+            };
+            package.run(sh, xtask)?;
+
+            match self.package_type {
+                PackageType::Aarch64Qemu => {
+                    let build_dir = self.package_type.binary().build_directory(xtask.release);
+                    let binary_path =
+                        format!("{}/{}", build_dir, self.package_type.binary().as_str());
+                    // Run elf image with generic loader
+                    // https://qemu.readthedocs.io/en/latest/system/generic-loader.html#setting-a-cpu-s-program-counter
+                    //
+                    // Starts at address 0x40100000 to avoid collisions with the dtb. Not sure why, but the dtb is
+                    // loaded at 0x40000000-0x40100000
+                    let loader_device =
+                        format!("loader,file={},addr=0x40100000,cpu-num=0", binary_path);
+                    cmd!(sh, "qemu-system-aarch64 -machine virt -cpu cortex-a57 -device {loader_device} -nographic").run()?;
+                }
+                PackageType::X86_64Uefi => {
+                    let build_dir = self.package_type.binary().build_directory(xtask.release);
+                    // TODO: Automatically pull or build OVMF firmware
+                    let ovmf_path = format!("{}/OVMF.fd", build_dir);
+                    let disk_path = format!("{}/disk.img", build_dir);
+
+                    let ovmf_drive = format!("file={},if=pflash,format=raw,readonly=on", ovmf_path);
+                    let disk_drive = format!("file={},format=raw", disk_path);
+
+                    cmd!(sh, "qemu-system-x86_64 -drive {ovmf_drive} -drive {disk_drive} -cpu qemu64 -net none -serial stdio").run()?;
                 }
             }
 

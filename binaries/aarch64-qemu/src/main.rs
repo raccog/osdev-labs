@@ -21,6 +21,7 @@ fn handle_panic(info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 #[link_section = ".text.boot"]
 pub unsafe extern "C" fn _entry_stage1() -> ! {
+    // Initialize default UART
     let uart = Pl011Uart::new(UART0_BASE_ADDRESS);
 
     writeln!(uart, "Hello UART!").unwrap();

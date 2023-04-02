@@ -6,8 +6,20 @@ I'm currently figuring out how I want the workflow to be structured. This includ
 
 Here's a list of the currently working commands:
 
-* `cargo xtask check --binary [all|aarch64-qemu|x86_64-uefi]`
-* `cargo xtask build --binary [all|aarch64-qemu|x86_64-uefi]`
+* `cargo xtask check [BINARY] [--json-message-format]`
+* `cargo xtask build [BINARY] [--json-message-format]`
+* `cargo xtask package PACKAGE`
+* `cargo xtask run PACKAGE`
+
+`BINARY` can be one of the following options (or it can be left blank to run for all binaries):
+
+* `aarch64-qemu`
+* `x86_64-uefi`
+
+`PACKAGE` needs to be one of the following options:
+
+* `aarch64-qemu`
+* `x86_64-uefi`
 
 Currently, only static analysis and building are implemented, no running yet.
 
@@ -17,6 +29,9 @@ Currently, only static analysis and building are implemented, no running yet.
 [x] Static analysis for all targets (including xtask itself)
 [x] Building for aarch64
 [x] Building for all targets
-[ ] Package for x86_64-uefi (create partitioned disk image)
-[ ] Running aarch64 on qemu
-[ ] Running x86_64-uefi on qemu
+[x] Package for x86_64-uefi (create partitioned disk image)
+[x] Running aarch64 on qemu
+[x] Running x86_64-uefi on qemu
+[ ] Find OVMF firmware or build it
+[ ] Clean build directories
+[ ] Fixup all TODOs
