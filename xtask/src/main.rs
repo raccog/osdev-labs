@@ -331,14 +331,11 @@ mod flags {
                     let build_dir = self.package_type.binary().build_directory(xtask.release);
                     let binary_path =
                         format!("{}/{}", build_dir, self.package_type.binary().as_str());
-                    // Run elf image with generic loader
-                    // https://qemu.readthedocs.io/en/latest/system/generic-loader.html#setting-a-cpu-s-program-counter
-                    //
-                    // Starts at address 0x40100000 to avoid collisions with the dtb. Not sure why, but the dtb is
-                    // loaded at 0x40000000-0x40100000
-                    let loader_device =
-                        format!("loader,file={},addr=0x40100000,cpu-num=0", binary_path);
-                    cmd!(sh, "qemu-system-aarch64 -machine virt -cpu cortex-a57 -device {loader_device} -nographic").run()?;
+                    cmd!(
+                        sh,
+                        "qemu-system-aarch64 -machine virt -cpu cortex-a57 -kernel {binary_path} -nographic"
+                    )
+                    .run()?;
                 }
                 PackageType::X86_64Uefi => {
                     let build_dir = self.package_type.binary().build_directory(xtask.release);

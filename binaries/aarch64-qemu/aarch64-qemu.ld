@@ -1,6 +1,6 @@
 ENTRY(_entry_stage0)
 SECTIONS {
-    . = 0x40100000;
+    . = 0x40000000;
     _PROGRAM_START = .;
     .text.boot : { *(.text.boot) }
     .text : { *(.text*) }
