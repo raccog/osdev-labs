@@ -52,6 +52,7 @@ mod flags {
     #[derive(Copy, Clone, Debug)]
     pub enum Binary {
         Aarch64Qemu,
+        RiscV64Qemu,
         X86_64Uefi,
         Xtask,
     }
@@ -62,6 +63,7 @@ mod flags {
             match s {
                 "aarch64-qemu" => Ok(Self::Aarch64Qemu),
                 "x86_64-uefi" => Ok(Self::X86_64Uefi),
+                "riscv64-qemu" => Ok(Self::RiscV64Qemu),
                 "xtask" => Ok(Self::Xtask),
                 _ => Err("Invalid binary"),
             }
@@ -73,6 +75,7 @@ mod flags {
         pub fn as_str(&self) -> &'static str {
             match self {
                 Self::Aarch64Qemu => "aarch64-qemu",
+                Self::RiscV64Qemu => "riscv64-qemu",
                 Self::X86_64Uefi => "x86_64-uefi",
                 Self::Xtask => "xtask",
             }
@@ -105,6 +108,7 @@ mod flags {
         pub fn target(&self) -> anyhow::Result<&'static str> {
             match self {
                 Self::Aarch64Qemu => Ok("binaries/aarch64-qemu/aarch64-qemu.json"),
+                Self::RiscV64Qemu => Ok("binaries/riscv64-qemu/riscv64-qemu.json"),
                 Self::X86_64Uefi => Ok("binaries/x86_64-uefi/x86_64-uefi.json"),
                 _ => bail!("This binary does not need a specific target"),
             }
@@ -115,6 +119,7 @@ mod flags {
     #[derive(Copy, Clone, Debug)]
     pub enum PackageType {
         Aarch64Qemu,
+        RiscV64Qemu,
         X86_64Uefi,
     }
 
@@ -123,6 +128,7 @@ mod flags {
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
                 "aarch64-qemu" => Ok(Self::Aarch64Qemu),
+                "riscv64-qemu" => Ok(Self::RiscV64Qemu),
                 "x86_64-uefi" => Ok(Self::X86_64Uefi),
                 _ => Err("Invalid package type"),
             }
@@ -133,6 +139,7 @@ mod flags {
         pub fn binary(&self) -> Binary {
             match self {
                 Self::Aarch64Qemu => Binary::Aarch64Qemu,
+                Self::RiscV64Qemu => Binary::RiscV64Qemu,
                 Self::X86_64Uefi => Binary::X86_64Uefi,
             }
         }
@@ -273,7 +280,7 @@ mod flags {
             build.run(sh, xtask)?;
 
             match self.package_type {
-                PackageType::Aarch64Qemu => {
+                PackageType::Aarch64Qemu | PackageType::RiscV64Qemu => {
                     // This binary does not need any packaging
                 }
                 PackageType::X86_64Uefi => {
@@ -334,6 +341,16 @@ mod flags {
                     cmd!(
                         sh,
                         "qemu-system-aarch64 -machine virt -cpu cortex-a57 -kernel {binary_path} -nographic"
+                    )
+                    .run()?;
+                }
+                PackageType::RiscV64Qemu => {
+                    let build_dir = self.package_type.binary().build_directory(xtask.release);
+                    let binary_path =
+                        format!("{}/{}", build_dir, self.package_type.binary().as_str());
+                    cmd!(
+                        sh,
+                        "qemu-system-riscv64 -machine virt -kernel {binary_path} -nographic"
                     )
                     .run()?;
                 }

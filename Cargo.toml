@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "binaries/aarch64-qemu",
+    "binaries/riscv64-qemu",
     "binaries/x86_64-uefi",
     "libraries/developing-modules",
     "xtask",
