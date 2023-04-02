@@ -17,5 +17,6 @@ Currently, only static analysis and building are implemented, no running yet.
 [x] Static analysis for all targets (including xtask itself)
 [x] Building for aarch64
 [x] Building for all targets
+[ ] Package for x86_64-uefi (create partitioned disk image)
 [ ] Running aarch64 on qemu
 [ ] Running x86_64-uefi on qemu
