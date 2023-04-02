@@ -32,7 +32,8 @@ mod flags {
     }
 
     // A list of all the valid binaries
-    const ALL_BINARIES: &'static [Binary] = &[Binary::Aarch64Qemu, Binary::X86_64Uefi];
+    const ALL_BINARIES: &'static [Binary] =
+        &[Binary::Aarch64Qemu, Binary::RiscV64Qemu, Binary::X86_64Uefi];
 
     // Some flags
     const JSON_MESSAGE_FORMAT_FLAG: &'static str = "--message-format=json";
