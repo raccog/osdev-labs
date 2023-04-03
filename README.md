@@ -25,13 +25,13 @@ Currently, only static analysis and building are implemented, no running yet.
 
 ### Workflow Roadmap
 
-[x] Static analysis for aarch64
-[x] Static analysis for all targets (including xtask itself)
-[x] Building for aarch64
-[x] Building for all targets
-[x] Package for x86_64-uefi (create partitioned disk image)
-[x] Running aarch64 on qemu
-[x] Running x86_64-uefi on qemu
-[ ] Find OVMF firmware or build it
-[ ] Clean build directories
-[ ] Fixup all TODOs
+- [x] Static analysis for aarch64
+- [x] Static analysis for all targets (including xtask itself)
+- [x] Building for aarch64
+- [x] Building for all targets
+- [x] Package for x86_64-uefi (create partitioned disk image)
+- [x] Running aarch64 on qemu
+- [x] Running x86_64-uefi on qemu
+- [ ] Find OVMF firmware or build it
+- [ ] Clean build directories
+- [ ] Fixup all TODOs
