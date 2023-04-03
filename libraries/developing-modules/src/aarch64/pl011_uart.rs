@@ -2,7 +2,7 @@
 
 use core::fmt::{self, Write};
 use tock_registers::{
-    interfaces::Writeable,
+    interfaces::{ReadWriteable, Readable, Writeable},
     register_bitfields, register_structs,
     registers::{ReadOnly, ReadWrite, WriteOnly},
 };
@@ -350,18 +350,73 @@ register_bitfields! [
 ];
 
 impl Pl011Uart {
-    pub unsafe fn new(base_addr: usize) -> &'static mut Self {
-        &mut *(base_addr as *mut Self)
+    pub unsafe fn new(base_addr: usize) -> Result<&'static mut Self, ()> {
+        let uart = &mut *(base_addr as *mut Self);
+
+        uart.init()?;
+
+        Ok(uart)
     }
 
-    pub unsafe fn init(&mut self) -> Result<(), ()> {
-        Err(())
+    fn init(&mut self) -> Result<(), ()> {
+        // These steps are done according to the ARM PrimeCell UART Manual. They can be found in the UARTCR Register
+        // summary section.
+        //
+        // 1. Disable the UART
+        self.cr.modify(Control::UARTEN::CLEAR);
+
+        // 2. Wait for end of transmission or reception of the current character
+        'not_busy: {
+            // Don't block for too long; return error if transmission/reception does not end
+            for _ in 0..0xff {
+                if !self.fr.is_set(Flag::BUSY) {
+                    break 'not_busy;
+                }
+            }
+
+            return Err(());
+        }
+
+        // 3. Flush the transmit FIFO
+        self.lcr_h.modify(LineControl::FEN::CLEAR);
+
+        // 4. Reprogram the UARTCR Register (control register)
+        {
+            // Enable transmit and receive. Disable loopback
+            self.cr
+                .modify(Control::RXE::SET + Control::TXE::SET + Control::LBE::CLEAR);
+
+            // Enable FIFOs
+            self.lcr_h.modify(LineControl::FEN::SET);
+
+            // TODO: Calculate baudrate at runtime
+            // Set baudrate to 115200
+            // Calculated using a clock input of 48 MHz
+            // Baud Rate Divisor = (48 * 10^6) / (16 * 115200) = 26.0417
+            // Integer Divisor = 26
+            // Fractional Divisor = integer((0.0417 * 64) + 0.5) = 3
+            // Generated Baud Rate Divisor = 26 + (3 / 64) = 0.046875
+            // Generated Baud Rate = (48 * 10^6) / (16 * 26.046875) = 115199.8525
+            // Error Rate = (115200 - 115176) / 115200 * 100 = 0.0217%
+            self.ibrd.set(26);
+            self.fbrd.set(3);
+        }
+
+        // 5. Enable the UART
+        self.cr.modify(Control::UARTEN::SET);
+
+        Ok(())
     }
 }
 
 impl Write for Pl011Uart {
     fn write_str(&mut self, out_string: &str) -> fmt::Result {
         for out_byte in out_string.bytes() {
+            // Don't block; just return an error if the FIFO is full
+            if self.dr.is_set(Data::OE) {
+                return Err(fmt::Error);
+            }
+
             self.dr.set(out_byte as u16);
         }
         Ok(())

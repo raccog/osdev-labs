@@ -13,7 +13,7 @@ global_asm!(include_str!("entry.S"));
 
 #[panic_handler]
 fn handle_panic(info: &core::panic::PanicInfo) -> ! {
-    let uart = unsafe { Pl011Uart::new(UART0_BASE_ADDRESS) };
+    let uart = unsafe { Pl011Uart::new(UART0_BASE_ADDRESS).unwrap() };
     writeln!(uart, "[PANIC] {}", info).unwrap();
     loop {}
 }
@@ -22,7 +22,7 @@ fn handle_panic(info: &core::panic::PanicInfo) -> ! {
 #[link_section = ".text.boot"]
 pub unsafe extern "C" fn _entry_stage1() -> ! {
     // Initialize default UART
-    let uart = Pl011Uart::new(UART0_BASE_ADDRESS);
+    let uart = Pl011Uart::new(UART0_BASE_ADDRESS).unwrap();
 
     writeln!(uart, "Hello UART!").unwrap();
 
