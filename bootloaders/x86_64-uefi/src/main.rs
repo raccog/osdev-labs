@@ -40,5 +40,11 @@ extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const
     }
     writeln!(serial, "{:?}", gdtr).unwrap();
 
+    let table = unsafe { gdtr.descriptor_table() };
+    writeln!(serial, "{} Descriptors", table.len()).unwrap();
+    for descriptor in table {
+        writeln!(serial, "{:?}", descriptor).unwrap();
+    }
+
     loop {}
 }

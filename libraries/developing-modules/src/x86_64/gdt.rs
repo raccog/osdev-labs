@@ -1,3 +1,5 @@
+use core::{mem, slice};
+
 #[repr(packed)]
 #[derive(Copy, Clone)]
 pub struct SegmentDescriptor {
@@ -75,6 +77,13 @@ impl SegmentDescriptor {
 
     fn limit_lo(&self) -> u32 {
         self.limit_lo as u32
+    }
+}
+
+impl Gdtr {
+    pub unsafe fn descriptor_table(&self) -> &[SegmentDescriptor] {
+        let length = (self.limit + 1) as usize / mem::size_of::<SegmentDescriptor>();
+        slice::from_raw_parts(self.base as *const u8 as *const SegmentDescriptor, length)
     }
 }
 
