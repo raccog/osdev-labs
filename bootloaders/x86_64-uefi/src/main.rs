@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::{ffi::c_void, fmt::Write};
+use core::ffi::c_void;
 
 use developing_modules::{serial::Serial, x86_64::uart::*};
 
@@ -27,7 +27,7 @@ extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const
         for b in "hello world!".bytes() {
             serial.write_byte(b).unwrap();
         }
-        writeln!(serial, "Hi serial").unwrap();
+        serial.serial_write_str("Hi serial").unwrap();
     }
 
     loop {}

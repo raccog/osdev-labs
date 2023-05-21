@@ -1,5 +1,3 @@
-use core::fmt::Write;
-
 use crate::{
     serial::{Error as SerialError, Serial},
     x86_64::port_io::{inb, outb},
@@ -117,6 +115,10 @@ impl Serial for UartX86 {
         Ok(())
     }
 
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+
     fn read_byte(&mut self) -> Result<u8, SerialError> {
         if !self.is_initialized {
             return Err("Tried to read a byte using uninitialized serial port");
@@ -133,20 +135,6 @@ impl Serial for UartX86 {
         }
 
         outb(self.port as u16, value);
-
-        Ok(())
-    }
-}
-
-impl Write for UartX86 {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        if !self.is_initialized {
-            return Err(core::fmt::Error);
-        }
-
-        for b in s.bytes() {
-            self.write_byte(b).unwrap();
-        }
 
         Ok(())
     }
