@@ -14,7 +14,7 @@
   "panic-strategy": "abort",
   "pre-link-args": {
     "ld.lld": [
-      "-Tbinaries/riscv64-qemu/riscv64-qemu.ld"
+      "-Tbootloaders/riscv64-qemu/riscv64-qemu.ld"
     ]
   },
   "relocation-model": "static",

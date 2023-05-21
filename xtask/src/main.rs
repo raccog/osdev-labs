@@ -108,9 +108,9 @@ mod flags {
         /// Returns the required platform target to build for or an error if it could be built for any target.
         pub fn target(&self) -> anyhow::Result<&'static str> {
             match self {
-                Self::Aarch64Qemu => Ok("binaries/aarch64-qemu/aarch64-qemu.json"),
-                Self::RiscV64Qemu => Ok("binaries/riscv64-qemu/riscv64-qemu.json"),
-                Self::X86_64Uefi => Ok("binaries/x86_64-uefi/x86_64-uefi.json"),
+                Self::Aarch64Qemu => Ok("bootloaders/aarch64-qemu/aarch64-qemu.json"),
+                Self::RiscV64Qemu => Ok("bootloaders/riscv64-qemu/riscv64-qemu.json"),
+                Self::X86_64Uefi => Ok("bootloaders/x86_64-uefi/x86_64-uefi.json"),
                 _ => bail!("This binary does not need a specific target"),
             }
         }

@@ -18,7 +18,7 @@
   ],
   "pre-link-args": {
     "ld.lld": [
-      "-Tbinaries/aarch64-qemu/aarch64-qemu.ld"
+      "-Tbootloaders/aarch64-qemu/aarch64-qemu.ld"
     ]
   },
   "target-pointer-width": "64"
