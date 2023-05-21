@@ -3,7 +3,7 @@
 
 use core::ffi::c_void;
 
-use developing_modules::x86_64::port_io::{inb, outb};
+use developing_modules::{serial::Serial, x86_64::uart::*};
 
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("Target needs to be x86_64");
@@ -15,22 +15,19 @@ fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
 
 #[export_name = "efi_main"]
 extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const c_void) -> u64 {
-    const PORT: u16 = 0x3f8;
+    let mut serial = UartX86::new(
+        UartX86Port::Com1,
+        UartX86Baud::Baud38400,
+        UartX86DataBits::Bits8,
+        UartX86StopBits::Bits1,
+        UartX86Parity::None,
+    );
 
-    outb(PORT + 1, 0x00);
-    outb(PORT + 3, 0x80);
-    outb(PORT + 0, 0x03);
-    outb(PORT + 1, 0x00);
-    outb(PORT + 3, 0x03);
-    outb(PORT + 2, 0xc7);
-    outb(PORT + 4, 0x0b);
-    outb(PORT + 4, 0x1e);
-    outb(PORT, 0xae);
-    if inb(PORT) == 0xae {
-        outb(PORT + 4, 0x0f);
-        outb(PORT, b'!');
-        loop {}
+    if serial.init().is_ok() {
+        for b in "hello world!".bytes() {
+            serial.write_byte(b).unwrap();
+        }
     }
 
-    0
+    loop {}
 }
