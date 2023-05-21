@@ -1,9 +1,14 @@
 #![no_std]
 #![no_main]
 
+use core::arch::asm;
 use core::ffi::c_void;
+use core::fmt::Write;
 
-use developing_modules::{serial::Serial, x86_64::uart::*};
+use developing_modules::{
+    serial::Serial,
+    x86_64::{gdt::Gdtr, uart::*},
+};
 
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("Target needs to be x86_64");
@@ -24,11 +29,16 @@ extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const
     );
 
     if serial.init().is_ok() {
-        for b in "hello world!".bytes() {
-            serial.write_byte(b).unwrap();
-        }
-        serial.serial_write_str("Hi serial").unwrap();
+        serial
+            .serial_write_str("Serial port initialized.\n")
+            .unwrap();
     }
+
+    let mut gdtr: Gdtr = Gdtr { base: 0, limit: 0 };
+    unsafe {
+        asm!("sgdt [{}]", in(reg) &mut gdtr, options(nostack, preserves_flags));
+    }
+    writeln!(serial, "{:?}", gdtr).unwrap();
 
     loop {}
 }

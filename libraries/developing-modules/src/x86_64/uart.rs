@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::{
     serial::{Error as SerialError, Serial},
     x86_64::port_io::{inb, outb},
@@ -137,5 +139,11 @@ impl Serial for UartX86 {
         outb(self.port as u16, value);
 
         Ok(())
+    }
+}
+
+impl fmt::Write for UartX86 {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.serial_write_str(s).map_err(|_| fmt::Error)
     }
 }
