@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 developing-modules = { path = "../../libraries/developing-modules" }
-tock-registers = "0.8.1"
