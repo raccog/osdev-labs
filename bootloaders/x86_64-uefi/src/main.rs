@@ -1,8 +1,7 @@
 #![no_std]
 #![no_main]
 
-use uefi::prelude::*;
-use uefi_services::{self, print};
+use core::ffi::c_void;
 
 use developing_modules::x86_64::port_io::{inb, outb};
 
@@ -14,10 +13,8 @@ fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
-#[entry]
-fn _entry_stage1(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut system_table).unwrap();
-
+#[export_name = "efi_main"]
+extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const c_void) -> u64 {
     const PORT: u16 = 0x3f8;
 
     outb(PORT + 1, 0x00);
@@ -29,9 +26,11 @@ fn _entry_stage1(image_handle: Handle, mut system_table: SystemTable<Boot>) -> S
     outb(PORT + 4, 0x0b);
     outb(PORT + 4, 0x1e);
     outb(PORT, 0xae);
-    print!("{:#x}", inb(PORT));
+    if inb(PORT) == 0xae {
+        outb(PORT + 4, 0x0f);
+        outb(PORT, b'!');
+        loop {}
+    }
 
-    loop {}
-
-    Status::SUCCESS
+    0
 }

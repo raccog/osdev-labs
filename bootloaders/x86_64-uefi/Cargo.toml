@@ -7,11 +7,3 @@ edition = "2021"
 
 [dependencies]
 developing-modules = { path = "../../libraries/developing-modules" }
-uefi = { version = "0.19.1", features = [
-    "alloc",
-    "global_allocator",
-    "logger",
-] }
-uefi-services = { version = "0.16.0", default-features = false, features = [
-    "logger",
-] }
