@@ -6,6 +6,7 @@ use core::ffi::c_void;
 use core::fmt::Write;
 
 use developing_modules::{
+    firmware::uefi::memory_map::*,
     serial::Serial,
     x86_64::{gdt::Gdtr, uart::*},
 };
@@ -19,7 +20,7 @@ fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[export_name = "efi_main"]
-extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const c_void) -> u64 {
+unsafe extern "efiapi" fn entry(_image_handle: *const c_void, system_table: *const UefiSystemTable) -> u64 {
     let mut serial = UartX86::new(
         UartX86Port::Com1,
         UartX86Baud::Baud38400,
@@ -34,6 +35,20 @@ extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const
             .unwrap();
     }
 
+    let boot_services = (*system_table).boot_services();
+    let map_size = (*boot_services).memory_map_size();
+    match map_size {
+        Ok(map_size) => writeln!(serial, "{}", map_size).unwrap(),
+        Err(err) => writeln!(serial, "Error: {:#x}", err).unwrap(),
+    };
+
+    // TODO: Allocate buffer
+    let map = (*boot_services).retrieve_memory_map();
+    match map {
+        Ok(map) => writeln!(serial, "Got map!").unwrap(),
+        Err(err) => writeln!(serial, "Error: {:#x}", err).unwrap(),
+    };
+
     let mut gdtr: Gdtr = Gdtr { base: 0, limit: 0 };
     unsafe {
         asm!("sgdt [{}]", in(reg) &mut gdtr, options(nostack, preserves_flags));
@@ -41,10 +56,10 @@ extern "efiapi" fn entry(_image_handle: *const c_void, mut _system_table: *const
     writeln!(serial, "{:?}", gdtr).unwrap();
 
     let table = unsafe { gdtr.descriptor_table() };
-    writeln!(serial, "{} Descriptors", table.len()).unwrap();
-    for descriptor in table {
-        writeln!(serial, "{:?}", descriptor).unwrap();
-    }
+    //writeln!(serial, "{} Descriptors", table.len()).unwrap();
+    //for descriptor in table {
+    //    writeln!(serial, "{:?}", descriptor).unwrap();
+    //}
 
     loop {}
 }
