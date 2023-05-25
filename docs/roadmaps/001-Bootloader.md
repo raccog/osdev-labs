@@ -14,6 +14,7 @@ This milestone is to load and run my kernel from memory using a bootloader.
 - [ ] Read kernel to memory
     - [ ] X86: read from file system using UEFI
     - [ ] arm/riscv(qemu): read from pre-loaded memory
+    - [ ] `rpi3/4 and bl808`: learn more about the boot process
 - [ ] Parse kernel elf sections and load to specified spots
 - [ ] Set up stack area
 - [ ] Set up struct to send to kernel
