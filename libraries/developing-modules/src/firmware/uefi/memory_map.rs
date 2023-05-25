@@ -2,12 +2,12 @@
 
 use core::{mem, ptr, slice, ffi::c_void};
 
-type UefiStatus = u64;
-type UefiHandle = *const c_void;
+pub type UefiStatus = u64;
+pub type UefiHandle = *const c_void;
 
 const UEFI_ERROR_BIT: UefiStatus = 1 << (core::mem::size_of::<u64>() * 8 - 1);
-const SUCCESS: UefiStatus = 0;
-const BUFFER_TOO_SMALL: UefiStatus = UEFI_ERROR_BIT | 5;
+pub const SUCCESS: UefiStatus = 0;
+pub const BUFFER_TOO_SMALL: UefiStatus = UEFI_ERROR_BIT | 5;
 
 // These are types that will be filled in later, as they are unused for now
 type TodoStruct = *const c_void;
@@ -61,7 +61,7 @@ pub struct UefiBootServices {
         descriptor_size: &mut u64,
         descriptor_version: &mut u32,
     ) -> UefiStatus,
-    allocate_pool: unsafe extern "efiapi" fn(
+    pub allocate_pool: unsafe extern "efiapi" fn(
         pool_type: UefiMemoryType,
         size: u64,
         buffer: *mut *mut c_void,
@@ -118,7 +118,7 @@ pub struct UefiMemoryDescriptor {
 #[repr(transparent)]
 pub struct UefiMemoryType(pub u32);
 
-const LOADER_DATA: UefiMemoryType = UefiMemoryType(2);
+pub const LOADER_DATA: UefiMemoryType = UefiMemoryType(2);
 
 #[derive(Debug)]
 pub struct UefiMemoryMap<'buf> {
@@ -149,14 +149,14 @@ impl UefiBootServices {
     }
 
     pub unsafe fn retrieve_memory_map<'buf>(&self, buf: &'buf mut [u8]) -> Result<UefiMemoryMap<'buf>, UefiStatus> {
-        let mut map_size: u32 = 0;
+        let mut map_size: u32 = buf.len() as u32;
         let mut map_key: u64 = 0;
         let mut descriptor_size: u64 = 0;
         let mut descriptor_version: u32 = 0;
 
         let status = (self.get_memory_map)(
             &mut map_size,
-            ptr::null_mut(),
+            buf.as_ptr() as *mut UefiMemoryDescriptor,
             &mut map_key,
             &mut descriptor_size,
             &mut descriptor_version,
@@ -166,22 +166,9 @@ impl UefiBootServices {
             return Err(status);
         }
 
-        map_size += (mem::size_of::<UefiMemoryDescriptor>() * 2) as u32;
-
-        let mut buffer: *mut c_void = ptr::null_mut();
-        let status = (self.allocate_pool)(
-            LOADER_DATA,
-            map_size as u64,
-            &mut buffer
-        );
-
-        if status != SUCCESS {
-            return Err(status);
-        }
-
         Ok(UefiMemoryMap {
             map_key,
-            map: slice::from_raw_parts_mut(buffer as *mut UefiMemoryDescriptor, map_size as usize / mem::size_of::<UefiMemoryDescriptor>())
+            map: buf.align_to_mut().1
         })
     }
 }
